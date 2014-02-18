@@ -1,6 +1,6 @@
 require "luaScript/PerformanceTest/PerformanceSpriteTest"
 
-local MAX_COUNT     = 5
+local MAX_COUNT     = 6
 local LINE_SPACE    = 40
 local kItemTagBasic = 1000
 
@@ -10,7 +10,8 @@ local testsName =
     "PerformanceParticleTest",
     "PerformanceSpriteTest",
     "PerformanceTextureTest",
-    "PerformanceTouchesTest"
+    "PerformanceTouchesTest",
+    "PerformanceStructBindingV2",
 }
 
 local s = CCDirector:sharedDirector():getWinSize()
@@ -1655,6 +1656,230 @@ local function runTouchesTest()
 end
 
 
+local function runStructBindingV2()
+    -- body
+    local newscene  = CCScene:create()
+    local layer     = CCLayer:create()
+    local s         = CCDirector:sharedDirector():getWinSize()
+    local scheduler = CCDirector:sharedDirector():getScheduler()
+    local scheduleEntryID = 0
+    local quantityOfNodes = 10000
+    local socket = require("socket")
+    local maxTime = 0.0
+    local minTime = 99999
+    local averageTime1 = 0.0
+    local averageTime2 = 0.0
+    local totalTime    = 0.0
+    local numberOfCalls = 0
+
+    local function GetTitle()
+        return "Table Conversion Performance Test"
+    end
+    
+    local function GetSubtitle()
+        return "See console for results"
+    end
+
+    local function initVar()
+        maxTime = 0.0
+        minTime = 99999
+        averageTime1 = 0.0
+        averageTime2 = 0.0
+        totalTime    = 0.0
+        numberOfCalls = 0
+    end
+
+    --Title
+    local title = CCLabelTTF:create(GetTitle(), "Arial", 28)
+    layer:addChild(title, 1)
+    title:setPosition(ccp(s.width/2, s.height-32))
+    title:setColor(ccc3(255,255,40)) 
+    --Subtitle
+    local subTitle = CCLabelTTF:create(GetSubtitle(), "Thonburi", 16)
+    layer:addChild(subTitle, 1)
+    subTitle:setPosition(ccp(s.width/2, s.height-80))
+
+    --"+","-" Menu
+    local function onDecrease()
+        quantityOfNodes = quantityOfNodes - 100
+        if quantityOfNodes == 0 then
+            quantityOfNodes = 100
+        end
+        local  numLabel = tolua.cast(layer:getChildByTag(NodeChildrenTestParam.kTagInfoLayer), "CCLabelTTF")
+        local  strNum = string.format("%d", quantityOfNodes)
+        numLabel:setString(strNum)    
+    end
+
+    local function onIncrease()
+        quantityOfNodes = quantityOfNodes + 100
+        local  numLabel = tolua.cast(layer:getChildByTag(NodeChildrenTestParam.kTagInfoLayer), "CCLabelTTF")
+        local  strNum = string.format("%d", quantityOfNodes)
+        numLabel:setString(strNum)  
+    end
+
+    CCMenuItemFont:setFontSize(65)
+    local decrease = CCMenuItemFont:create(" - ")
+    decrease:registerScriptTapHandler(onDecrease)
+    decrease:setColor(ccc3(0,200,20))
+    local increase = CCMenuItemFont:create(" + ")
+    increase:registerScriptTapHandler(onIncrease)
+    increase:setColor(ccc3(0,200,20))
+        
+    local menuAddOrSub = CCMenu:create()
+    menuAddOrSub:addChild(decrease)
+    menuAddOrSub:addChild(increase)
+    menuAddOrSub:alignItemsHorizontally()
+    menuAddOrSub:setPosition(ccp(s.width/2, s.height/2+15))
+    layer:addChild(menuAddOrSub,1)
+
+    --num
+    local numLabel = CCLabelTTF:create("10000", "Marker Felt", 30)
+    numLabel:setColor(ccc3(0,200,20))
+    numLabel:setPosition(ccp(s.width/2, s.height/2-15))
+    layer:addChild(numLabel, 1, NodeChildrenTestParam.kTagInfoLayer)
+
+    --setPosition,getPosition,Point
+    CCMenuItemFont:setFontSize(35)
+    local setPositionItem = CCMenuItemFont:create("setPosition")
+    local getPositionItem = CCMenuItemFont:create("getPosition")
+    local getAnchorPointItem = CCMenuItemFont:create("getAnchorPoint")
+    local pointItem       = CCMenuItemFont:create("object")
+    local funcToggleItem  = CCMenuItemToggle:create(setPositionItem)
+    funcToggleItem:addSubItem(getPositionItem)
+    funcToggleItem:addSubItem(getAnchorPointItem)
+    funcToggleItem:addSubItem(pointItem)
+    funcToggleItem:setAnchorPoint(ccp(0.0, 0.5))
+    funcToggleItem:setPosition(ccp(VisibleRect:left().x,VisibleRect:left().y))
+    local funcMenu = CCMenu:create()
+    funcMenu:addChild(funcToggleItem)
+    funcMenu:setPosition(ccp(0, 0))
+    layer:addChild(funcMenu)
+
+    local testNode = CCNode:create()
+    layer:addChild(testNode)
+
+    local function step(dt)
+        print(string.format("push num: %d, avg1:%f, avg2:%f,min:%f, max:%f, total: %f, calls: %d",quantityOfNodes, averageTime1, averageTime2, minTime, maxTime, totalTime, numberOfCalls))
+    end
+
+    local function profileEnd(startTime)
+        local duration = socket.gettime() - startTime
+        totalTime = totalTime + duration
+        averageTime1 = (averageTime1 + duration) / 2
+        averageTime2 = totalTime / numberOfCalls
+
+        if maxTime < duration then
+            maxTime = duration
+        end
+
+        if minTime > duration then
+            minTime = duration
+        end
+    end
+
+    local function callSetPosition()
+        numberOfCalls = numberOfCalls + 1
+        local startTime = socket.gettime()
+        for i=1,quantityOfNodes do
+            testNode:setPosition(ccp(1,2))
+        end
+        profileEnd(startTime)
+    end
+
+    local function callGetPosition()
+        numberOfCalls = numberOfCalls + 1
+        local startTime = socket.gettime()
+        for i=1,quantityOfNodes do
+            local x,y = testNode:getPosition()
+        end
+        profileEnd(startTime)
+    end
+
+    local function callGetAnchorPoint()
+        numberOfCalls = numberOfCalls + 1
+        local startTime = socket.gettime()
+        for i=1,quantityOfNodes do
+            local anchorPoint = testNode:getAnchorPoint()
+        end
+        profileEnd(startTime)
+    end
+
+    local function callTableObject()
+        numberOfCalls = numberOfCalls + 1
+        local startTime = socket.gettime()
+        for i=1,quantityOfNodes do
+            local pt = CCPointMake(1,2)
+        end
+        profileEnd(startTime)
+    end
+
+    local function update(dt)
+
+        local funcSelected = funcToggleItem:getSelectedIndex()
+        if 0 == funcSelected then
+            callSetPosition()
+        elseif 1 == funcSelected then
+            callGetPosition()
+        elseif 2 == funcSelected then
+            callGetAnchorPoint()
+        elseif 3 == funcSelected then
+            callTableObject()
+        end
+    end
+
+    local function onNodeEvent(tag)
+        if tag == "exit" then
+            self:unscheduleUpdate()
+            if 0 ~= scheduleEntryID then
+                scheduler:unscheduleScriptEntry(scheduleEntryID)
+            end
+        end
+    end
+
+    layer:registerScriptHandler(onNodeEvent)
+
+
+    local function startCallback()
+        initVar()
+        decrease:setEnabled(false)
+        increase:setEnabled(false)
+        layer:unscheduleUpdate()
+        layer:scheduleUpdateWithPriorityLua(update, 0)
+        if 0 ~= scheduleEntryID then
+            scheduler:unscheduleScriptEntry(scheduleEntryID)
+        end
+        scheduleEntryID = scheduler:scheduleScriptFunc(step,2,false)
+    end
+
+    local function stopCallback()
+        decrease:setEnabled(true)
+        increase:setEnabled(true)
+        layer:unscheduleUpdate()
+        if 0 ~= scheduleEntryID then
+            scheduler:unscheduleScriptEntry(scheduleEntryID)
+        end
+    end
+    local startItem = CCMenuItemFont:create("start")
+    startItem:registerScriptTapHandler(startCallback)
+    local stopItem  = CCMenuItemFont:create("stop")
+    stopItem:registerScriptTapHandler(stopCallback)
+    local startAndStop = CCMenu:create()
+    startAndStop:addChild(startItem)
+    startAndStop:addChild(stopItem)
+    startAndStop:alignItemsVertically()
+    startAndStop:setPosition(VisibleRect:right().x - 50, VisibleRect:right().y)
+    layer:addChild(startAndStop)
+
+    --back menu
+    local menu = CCMenu:create()
+    CreatePerfomBasicLayerMenu(menu)
+    menu:setPosition(ccp(0, 0))
+    layer:addChild(menu)
+
+    newscene:addChild(layer)
+    return newscene
+end
+
 ------------------------
 --
 ------------------------
@@ -1664,7 +1889,8 @@ local CreatePerformancesTestTable =
 	runParticleTest,
 	runSpriteTest,
 	runTextureTest,
-	runTouchesTest	
+	runTouchesTest,
+    runStructBindingV2,	
 }
 
 local function CreatePerformancesTestScene(nPerformanceNo)
