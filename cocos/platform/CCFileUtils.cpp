@@ -927,7 +927,7 @@ bool FileUtils::writeStringToFile(const std::string& content, const std::string&
     
     if (!isExist(dir))
     {
-        createDirectorys(dir);
+        createDirectories(dir);
     }
     
     FILE* fp = fopen(fullpath.c_str(), "wb");
@@ -974,7 +974,7 @@ bool FileUtils::createDirectory(const std::string& dirPath)
     return true;
 }
 
-bool FileUtils::createDirectorys(const std::string& path)
+bool FileUtils::createDirectories(const std::string& path)
 {
     // Split the path
     size_t start = 0;
@@ -1013,13 +1013,15 @@ bool FileUtils::createDirectorys(const std::string& path)
         dir = opendir (subpath.c_str());
         if (!dir)
         {
+            CCLOG("create dir %s", subpath.c_str());
             if (0 != mkdir(subpath.c_str(), S_IRWXU | S_IRWXG | S_IRWXO))
             {
+                CCLOGERROR("Create dir %s failed!", subpath.c_str());
                 return false;
             }
+            CCLOG("create dir %s succeed!", subpath.c_str());
         }
     }
-    
 #else
     if ((GetFileAttributesA(path.c_str())) == INVALID_FILE_ATTRIBUTES)
     {

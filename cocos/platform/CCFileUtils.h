@@ -345,7 +345,7 @@ public:
     /**
      *  Creates a directory recursively
      */
-    virtual bool createDirectorys(const std::string& dirPath);
+    virtual bool createDirectories(const std::string& dirPath);
     
     /**
      *  Converts the contents of a file to a ValueVector.
