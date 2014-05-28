@@ -42,9 +42,11 @@
 -- @return array_table#array_table ret (return value: array_table)
         
 --------------------------------
--- @function [parent=#FileUtils] getSearchPaths 
+-- @function [parent=#FileUtils] writeStringTofile 
 -- @param self
--- @return array_table#array_table ret (return value: array_table)
+-- @param #string str
+-- @param #string str
+-- @return bool#bool ret (return value: bool)
         
 --------------------------------
 -- @function [parent=#FileUtils] writeToFile 
@@ -103,6 +105,11 @@
         
 --------------------------------
 -- @function [parent=#FileUtils] getSearchResolutionsOrder 
+-- @param self
+-- @return array_table#array_table ret (return value: array_table)
+        
+--------------------------------
+-- @function [parent=#FileUtils] getSearchPaths 
 -- @param self
 -- @return array_table#array_table ret (return value: array_table)
         
