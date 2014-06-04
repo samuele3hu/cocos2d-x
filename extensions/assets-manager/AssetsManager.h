@@ -46,6 +46,7 @@ class AssetsManager : public Ref
 public:
     
     friend class Downloader;
+    friend int downloadProgressFunc(Downloader::ProgressData *ptr, double totalToDownload, double nowDownloaded, double totalToUpLoad, double nowUpLoaded);
     
     //! Update states
     enum class State
@@ -65,6 +66,7 @@ public:
     
     const static std::string VERSION_ID;
     const static std::string MANIFEST_ID;
+    const static std::string BATCH_UPDATE_ID;
     
     /** @brief Create function for creating a new AssetsManager
      @param manifestUrl   The url for the local manifest file
@@ -83,6 +85,14 @@ public:
     /** @brief Update with the current local manifest.
      */
     void update();
+    
+    /** @brief Update a list of assets under the current AssetsManager context
+     */
+    void updateAssets(const std::unordered_map<std::string, Downloader::DownloadUnit>& assets);
+    
+    /** @brief Retrieve all failed assets during the last update
+     */
+    const std::unordered_map<std::string, Downloader::DownloadUnit>& getFailedAssets() const;
     
     /** @brief Gets the current update state.
      */
@@ -108,13 +118,13 @@ CC_CONSTRUCTOR_ACCESS:
     
 protected:
     
-    static void createDirectory(const std::string &path);
+    static bool createDirectory(const std::string &path);
     
-    static void removeDirectory(const std::string &path);
+    static bool removeDirectory(const std::string &path);
     
-    static void removeFile(const std::string &path);
+    static bool removeFile(const std::string &path);
     
-    static void renameFile(const std::string &path, const std::string &oldname, const std::string &name);
+    static bool renameFile(const std::string &path, const std::string &oldname, const std::string &name);
     
     std::string get(const std::string& key) const;
     
@@ -126,15 +136,14 @@ protected:
     
     void adjustPath(std::string &path);
     
-    void dispatchUpdateEvent(EventAssetsManager::EventCode code, std::string message = "", std::string assetId = "");
+    void dispatchUpdateEvent(EventAssetsManager::EventCode code, std::string message = "", std::string assetId = "", int curle_code = 0, int curlm_code = 0);
     
     void downloadVersion();
     void parseVersion();
     void downloadManifest();
     void parseManifest();
     void startUpdate();
-// TODO: For next version
-    //bool uncompress();
+    bool decompress(std::string filename);
     
     /** @brief Function for destorying the downloaded version file and manifest file
      */
@@ -169,7 +178,7 @@ protected:
      * @js NA
      * @lua NA
      */
-    virtual void onSuccess(const std::string &srcUrl, const std::string &customId);
+    virtual void onSuccess(const std::string &srcUrl, const std::string &storagePath, const std::string &customId);
     
 private:
     
@@ -216,6 +225,12 @@ private:
     
     //! All assets unit to download
     std::unordered_map<std::string, Downloader::DownloadUnit> _downloadUnits;
+    
+    //! All failed units
+    std::unordered_map<std::string, Downloader::DownloadUnit> _failedUnits;
+    
+    //! All files to be decompressed
+    std::vector<std::string> _compressedFiles;
     
     //! Download percent
     float _percent;
