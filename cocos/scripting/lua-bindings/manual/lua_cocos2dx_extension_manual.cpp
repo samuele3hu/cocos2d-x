@@ -1342,13 +1342,6 @@ static void extendTableView(lua_State* L)
     lua_pop(L, 1);
 }
 
-static void extendManifest(lua_State* L)
-{
-    lua_pushstring(L, "cc.Manifest");
-    lua_rawget(L, LUA_REGISTRYINDEX);
-    lua_pop(L, 1);
-}
-
 static int lua_cocos2dx_Extension_EventListenerAssetsManager_create(lua_State* L)
 {
     if (nullptr == L)
@@ -1409,6 +1402,176 @@ static void extendEventListenerAssetsManager(lua_State* L)
     lua_pop(L, 1);
 }
 
+static int lua_cocos2dx_Extension_AssetsManager_getFailedAssets(lua_State* L)
+{
+    if (nullptr == L)
+        return 0;
+    
+    int argc = 0;
+    cocos2d::extension::AssetsManager* self = nullptr;
+    
+#if COCOS2D_DEBUG >= 1
+    tolua_Error tolua_err;
+    if (!tolua_isusertype(L,1,"cc.AssetsManager",0,&tolua_err)) goto tolua_lerror;
+#endif
+    
+    self = (cocos2d::extension::AssetsManager*)tolua_tousertype(L,1,0);
+    
+#if COCOS2D_DEBUG >= 1
+    if (nullptr == self)
+    {
+        tolua_error(L,"invalid 'cobj' in function 'lua_cocos2dx_Extension_AssetsManager_getFailedAssets'", nullptr);
+        return 0;
+    }
+#endif
+    
+    argc = lua_gettop(L)-1;
+    if (argc == 0)
+    {
+        const std::unordered_map<std::string, cocos2d::extension::Downloader::DownloadUnit> failedAssets = self->getFailedAssets();
+        
+        lua_newtable(L);
+        for (auto const & failedAsset : failedAssets)
+        {
+            tolua_pushcppstring(L, failedAsset.first);
+            
+            lua_newtable(L);
+            tolua_pushstring(L, "srcUrl");
+            tolua_pushcppstring(L, failedAsset.second.srcUrl);
+            lua_rawset(L, -3);
+            tolua_pushstring(L, "storagePath");
+            tolua_pushcppstring(L, failedAsset.second.storagePath);
+            lua_rawset(L, -3);
+            tolua_pushstring(L, "customId");
+            tolua_pushcppstring(L, failedAsset.second.customId);
+            lua_rawset(L, -3);
+            
+            lua_rawset(L, -3);
+        }
+        
+        
+        return 1;
+    }
+    
+    CCLOG("%s has wrong number of arguments: %d, was expecting %d \n", "getFailedAssets",argc, 0);
+    return 0;
+    
+#if COCOS2D_DEBUG >= 1
+tolua_lerror:
+    tolua_error(L,"#ferror in function 'lua_cocos2dx_Extension_AssetsManager_getFailedAssets'.",&tolua_err);
+    return 0;
+#endif
+}
+
+static int lua_cocos2dx_Extension_AssetsManager_updateAssets(lua_State* L)
+{
+    if (nullptr == L)
+        return 0;
+    
+    int argc = 0;
+    cocos2d::extension::AssetsManager* self = nullptr;
+    
+#if COCOS2D_DEBUG >= 1
+    tolua_Error tolua_err;
+    if (!tolua_isusertype(L,1,"cc.AssetsManager",0,&tolua_err)) goto tolua_lerror;
+#endif
+    
+    self = (cocos2d::extension::AssetsManager*)tolua_tousertype(L,1,0);
+    
+#if COCOS2D_DEBUG >= 1
+    if (nullptr == self)
+    {
+        tolua_error(L,"invalid 'cobj' in function 'lua_cocos2dx_Extension_AssetsManager_updateAssets'", nullptr);
+        return 0;
+    }
+#endif
+    
+    argc = lua_gettop(L)-1;
+    if (argc == 1)
+    {
+#if COCOS2D_DEBUG >= 1
+        if (!tolua_istable(L, 2, 0, &tolua_err))
+            goto tolua_lerror;
+#endif
+        std::unordered_map<std::string, Downloader::DownloadUnit> updateAssets;
+        updateAssets.clear();
+        std::string customId = "";
+        cocos2d::extension::Downloader::DownloadUnit updateAsset;
+        
+        lua_pushnil(L);
+        while (0 != lua_next(L, 2))
+        {
+            customId = "";
+            memset(&updateAsset, 0, sizeof(cocos2d::extension::Downloader::DownloadUnit));
+            
+            if (!lua_isstring(L, -2))
+            {
+                lua_pop(L, 1);                                      /* removes 'value'; keep 'key' for next iteration*/
+                continue;
+            }
+            customId = tolua_tocppstring(L, -2, "");
+            if (lua_istable(L, -1))
+            {
+                lua_pushstring(L, "srcUrl");
+                lua_gettable(L, -2);
+                if (lua_isstring(L, -1))
+                {
+                    updateAsset.srcUrl = tolua_tocppstring(L, -1, "");
+                }
+                lua_pop(L, 1);
+
+                tolua_pushstring(L, "storagePath");
+                lua_gettable(L, -2);
+                if (lua_isstring(L, -1))
+                {
+                    updateAsset.storagePath = tolua_tocppstring(L, -1, "");
+                }
+                lua_pop(L, 1);
+
+                tolua_pushstring(L, "customId");
+                lua_gettable(L, -2);
+                if (lua_isstring(L, -1))
+                {
+                    updateAsset.customId = tolua_tocppstring(L, -1, "");
+                }
+                lua_pop(L, 1);
+            }
+            
+            lua_pop(L, 1);
+            
+            updateAssets.insert(std::make_pair(customId, updateAsset));
+        }
+        
+        if (!updateAssets.empty())
+        {
+            self->updateAssets(updateAssets);
+        }
+        
+        return 0;
+    }
+    
+    CCLOG("%s has wrong number of arguments: %d, was expecting %d \n", "updateAssets",argc, 1);
+    return 0;
+    
+#if COCOS2D_DEBUG >= 1
+tolua_lerror:
+    tolua_error(L,"#ferror in function 'lua_cocos2dx_Extension_AssetsManager_updateAssets'.",&tolua_err);
+    return 0;
+#endif
+}
+
+static void extendAssetsManager(lua_State* L)
+{
+    lua_pushstring(L, "cc.AssetsManager");
+    lua_rawget(L, LUA_REGISTRYINDEX);
+    if (lua_istable(L,-1))
+    {
+        tolua_function(L, "getFailedAssets", lua_cocos2dx_Extension_AssetsManager_getFailedAssets);
+        tolua_function(L, "updateAssets", lua_cocos2dx_Extension_AssetsManager_updateAssets);
+    }
+    lua_pop(L, 1);
+}
+
 int register_all_cocos2dx_extension_manual(lua_State* tolua_S)
 {
     extendControl(tolua_S);
@@ -1417,7 +1580,7 @@ int register_all_cocos2dx_extension_manual(lua_State* tolua_S)
     extendCCBAnimationManager(tolua_S);
     extendScrollView(tolua_S);
     extendTableView(tolua_S);
-    extendManifest(tolua_S);
     extendEventListenerAssetsManager(tolua_S);
+    extendAssetsManager(tolua_S);
     return 0;
 }
