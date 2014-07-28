@@ -366,13 +366,11 @@ void object_to_luaval(lua_State* L,const char* type, T* ret)
 
         if (nullptr != dynObject)
         {
-            int ID = (int)(dynObject->_ID) ;
-            int* luaID = &(dynObject->_luaID);
-            toluafix_pushusertype_ccobject(L,ID, luaID, (void*)ret,type);
+            toluafix_pushusertype_ref(L,(void*)ret, type);
         }
         else
         {
-            tolua_pushusertype(L,(void*)ret,getLuaTypeName(ret, type));
+            toluafix_pushusertype_no_ref(L,(void*)ret,getLuaTypeName(ret, type));
         }
     }
     else

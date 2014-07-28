@@ -29,38 +29,41 @@ TOLUA_API int toluafix_pushusertype_ccobject(lua_State* L,
                                              void* ptr,
                                              const char* type)
 {
-    if (ptr == NULL || p_refid == NULL)
-    {
-        lua_pushnil(L);
-        return -1;
-    }
+    toluafix_pushusertype_ref(L, ptr, type);
+    return 0;
     
-    Ref* vPtr = static_cast<Ref*>(ptr);
-    const char* vType = getLuaTypeName(vPtr, type);
-
-    if (*p_refid == 0)
-    {
-        *p_refid = refid;
-
-        lua_pushstring(L, TOLUA_REFID_PTR_MAPPING);
-        lua_rawget(L, LUA_REGISTRYINDEX);                           /* stack: refid_ptr */
-        lua_pushinteger(L, refid);                                  /* stack: refid_ptr refid */
-        lua_pushlightuserdata(L, vPtr);                              /* stack: refid_ptr refid ptr */
-
-        lua_rawset(L, -3);                  /* refid_ptr[refid] = ptr, stack: refid_ptr */
-        lua_pop(L, 1);                                              /* stack: - */
-
-        lua_pushstring(L, TOLUA_REFID_TYPE_MAPPING);
-        lua_rawget(L, LUA_REGISTRYINDEX);                           /* stack: refid_type */
-        lua_pushinteger(L, refid);                                  /* stack: refid_type refid */
-        lua_pushstring(L, vType);                                    /* stack: refid_type refid type */
-        lua_rawset(L, -3);                /* refid_type[refid] = type, stack: refid_type */
-        lua_pop(L, 1);                                              /* stack: - */
-
-        //printf("[LUA] push CCObject OK - refid: %d, ptr: %x, type: %s\n", *p_refid, (int)ptr, type);
-    }
-
-    tolua_pushusertype_and_addtoroot(L, vPtr, vType);
+//    if (ptr == NULL || p_refid == NULL)
+//    {
+//        lua_pushnil(L);
+//        return -1;
+//    }
+//    
+//    Ref* vPtr = static_cast<Ref*>(ptr);
+//    const char* vType = getLuaTypeName(vPtr, type);
+//
+//    if (*p_refid == 0)
+//    {
+//        *p_refid = refid;
+//
+//        lua_pushstring(L, TOLUA_REFID_PTR_MAPPING);
+//        lua_rawget(L, LUA_REGISTRYINDEX);                           /* stack: refid_ptr */
+//        lua_pushinteger(L, refid);                                  /* stack: refid_ptr refid */
+//        lua_pushlightuserdata(L, vPtr);                              /* stack: refid_ptr refid ptr */
+//
+//        lua_rawset(L, -3);                  /* refid_ptr[refid] = ptr, stack: refid_ptr */
+//        lua_pop(L, 1);                                              /* stack: - */
+//
+//        lua_pushstring(L, TOLUA_REFID_TYPE_MAPPING);
+//        lua_rawget(L, LUA_REGISTRYINDEX);                           /* stack: refid_type */
+//        lua_pushinteger(L, refid);                                  /* stack: refid_type refid */
+//        lua_pushstring(L, vType);                                    /* stack: refid_type refid type */
+//        lua_rawset(L, -3);                /* refid_type[refid] = type, stack: refid_type */
+//        lua_pop(L, 1);                                              /* stack: - */
+//
+//        //printf("[LUA] push CCObject OK - refid: %d, ptr: %x, type: %s\n", *p_refid, (int)ptr, type);
+//    }
+//
+//    tolua_pushusertype_and_addtoroot(L, vPtr, vType);
     
     return 0;
 }
@@ -255,4 +258,164 @@ TOLUA_API void toluafix_stack_dump(lua_State* L, const char* label)
         }
     }
     printf("\n");
+}
+
+void toluafix_pushusertype_ref(lua_State* L, void* ptr, const char* type)
+{
+    if (nullptr == ptr || nullptr == type)
+    {
+        lua_pushnil(L);
+    }
+    else
+    {
+        cocos2d::Ref* vPtr = static_cast<Ref*>(ptr);
+        const char* vType  = getLuaTypeName(vPtr, type);
+        luaL_getmetatable(L, vType);      /* stack: mt */
+        if (lua_isnil(L, -1))
+        {
+            lua_pop(L, 1);                /* NOT FOUND metatable,stack:*/
+            lua_pushnil(L);
+            return;
+        }
+        
+        lua_pushstring(L, "tolua_ubox");  /* stack: mt string */
+        lua_rawget(L, -2);                /* stack: mt ubox */
+        if (lua_isnil(L, -1))
+        {
+            lua_pop(L, 1);
+            lua_pushstring(L, "tolua_ubox");
+            lua_rawget(L, LUA_REGISTRYINDEX);
+        }
+
+        lua_pushlightuserdata(L,vPtr);   /* stack: mt ubox key<value> */
+        lua_rawget(L,-2);                /* stack: mt ubox ubox[value] */
+        
+        if (lua_isnil(L,-1))
+        {
+            lua_pop(L,1);                                           /* stack: mt ubox */
+            lua_pushlightuserdata(L,vPtr);
+            *(void**)lua_newuserdata(L,sizeof(void *)) = vPtr;     /* stack: mt ubox value newud */
+            lua_pushvalue(L,-1);                                    /* stack: mt ubox value newud newud */
+            lua_insert(L,-4);                                       /* stack: mt newud ubox value newud */
+            lua_rawset(L,-3);                  /* ubox[value] = newud, stack: mt newud ubox */
+            lua_pop(L,1);                                           /* stack: mt newud */
+            /*luaL_getmetatable(L,type);*/
+            lua_pushvalue(L, -2);                                   /* stack: mt newud mt */
+            lua_setmetatable(L,-2);                      /* update mt, stack: mt newud */
+            
+#ifdef LUA_VERSION_NUM
+            lua_pushvalue(L, TOLUA_NOPEER);             /* stack: mt newud peer */
+            lua_setfenv(L, -2);                         /* stack: mt newud */
+#endif
+            lua_remove(L, -2);                       /* stack: ubox[u]*/
+            vPtr->retain();
+            cocos2d::log("referencount is %d", vPtr->_referenceCount);
+            tolua_register_gc(L,lua_gettop(L));
+        }
+        else
+        {
+            /* check the need of updating the metatable to a more specialized class */
+            lua_insert(L,-2);                                       /* stack: mt ubox[u] ubox */
+            lua_pop(L,1);                                           /* stack: mt ubox[u] */
+            lua_pushstring(L,"tolua_super");
+            lua_rawget(L,LUA_REGISTRYINDEX);                        /* stack: mt ubox[u] super */
+            lua_getmetatable(L,-2);                                 /* stack: mt ubox[u] super mt */
+            lua_rawget(L,-2);                                       /* stack: mt ubox[u] super super[mt] */
+            if (lua_istable(L,-1))
+            {
+                lua_pushstring(L,vType);                             /* stack: mt ubox[u] super super[mt] type */
+                lua_rawget(L,-2);                                   /* stack: mt ubox[u] super super[mt] flag */
+                if (lua_toboolean(L,-1) == 1)                       /* if true */
+                {
+                    lua_pop(L,3);                                   /* mt ubox[u]*/
+                    lua_remove(L, -2);
+                    return;
+                }
+            }
+            /* type represents a more specilized type */
+            /*luaL_getmetatable(L,type);             // stack: mt ubox[u] super super[mt] flag mt */
+            lua_pushvalue(L, -5);                    /* stack: mt ubox[u] super super[mt] flag mt */
+            lua_setmetatable(L,-5);                  /* stack: mt ubox[u] super super[mt] flag */
+            lua_pop(L,3);                            /* stack: mt ubox[u] */
+            lua_remove(L, -2);                       /* stack: ubox[u]*/
+        }
+        
+    }
+}
+
+void toluafix_pushusertype_no_ref(lua_State* L, void* ptr, const char* type)
+{
+    if (nullptr == ptr || nullptr == type)
+    {
+        lua_pushnil(L);
+    }
+    else
+    {
+        luaL_getmetatable(L, type);      /* stack: mt */
+        if (lua_isnil(L, -1))
+        {
+            lua_pop(L, 1);                /* NOT FOUND metatable,stack:*/
+            lua_pushnil(L);
+            return;
+        }
+        
+        lua_pushstring(L, "tolua_ubox");  /* stack: mt string */
+        lua_rawget(L, -2);                /* stack: mt ubox */
+        if (lua_isnil(L, -1))
+        {
+            lua_pop(L, 1);
+            lua_pushstring(L, "tolua_ubox");
+            lua_rawget(L, LUA_REGISTRYINDEX);
+        }
+        //TODO CAREFUL
+        lua_pushlightuserdata(L,ptr);   /* stack: mt ubox key<value> */
+        lua_rawget(L,-2);                /* stack: mt ubox ubox[value] */
+        
+        if (lua_isnil(L,-1))
+        {
+            lua_pop(L,1);                                           /* stack: mt ubox */
+            lua_pushlightuserdata(L,ptr);
+            *(void**)lua_newuserdata(L,sizeof(void *)) = ptr;     /* stack: mt ubox value newud */
+            lua_pushvalue(L,-1);                                    /* stack: mt ubox value newud newud */
+            lua_insert(L,-4);                                       /* stack: mt newud ubox value newud */
+            lua_rawset(L,-3);                  /* ubox[value] = newud, stack: mt newud ubox */
+            lua_pop(L,1);                                           /* stack: mt newud */
+            /*luaL_getmetatable(L,type);*/
+            lua_pushvalue(L, -2);                                   /* stack: mt newud mt */
+            lua_setmetatable(L,-2);                      /* update mt, stack: mt newud */
+            
+#ifdef LUA_VERSION_NUM
+            lua_pushvalue(L, TOLUA_NOPEER);             /* stack: mt newud peer */
+            lua_setfenv(L, -2);                         /* stack: mt newud */
+#endif
+            lua_remove(L, -2);    /* stack: ubox[u]*/
+            //tolua_register_gc(L,lua_gettop(L));
+        }
+        else
+        {
+            /* check the need of updating the metatable to a more specialized class */
+            lua_insert(L,-2);                                       /* stack: mt ubox[u] ubox */
+            lua_pop(L,1);                                           /* stack: mt ubox[u] */
+            lua_pushstring(L,"tolua_super");
+            lua_rawget(L,LUA_REGISTRYINDEX);                        /* stack: mt ubox[u] super */
+            lua_getmetatable(L,-2);                                 /* stack: mt ubox[u] super mt */
+            lua_rawget(L,-2);                                       /* stack: mt ubox[u] super super[mt] */
+            if (lua_istable(L,-1))
+            {
+                lua_pushstring(L,type);                             /* stack: mt ubox[u] super super[mt] type */
+                lua_rawget(L,-2);                                   /* stack: mt ubox[u] super super[mt] flag */
+                if (lua_toboolean(L,-1) == 1)                       /* if true */
+                {
+                    lua_pop(L,3);                                   /* mt ubox[u]*/
+                    lua_remove(L, -2);
+                    return;
+                }
+            }
+            /* type represents a more specilized type */
+            /*luaL_getmetatable(L,type);             // stack: mt ubox[u] super super[mt] flag mt */
+            lua_pushvalue(L, -5);                    /* stack: mt ubox[u] super super[mt] flag mt */
+            lua_setmetatable(L,-5);                /* stack: mt ubox[u] super super[mt] flag */
+            lua_pop(L,3);                          /* stack: mt ubox[u] */
+        }
+    }
 }

@@ -22,5 +22,7 @@ TOLUA_API int toluafix_isfunction(lua_State* L, int lo, const char* type, int de
 TOLUA_API int toluafix_totable(lua_State* L, int lo, int def);
 TOLUA_API int toluafix_istable(lua_State* L, int lo, const char* type, int def, tolua_Error* err);
 TOLUA_API void toluafix_stack_dump(lua_State* L, const char* label);
+TOLUA_API void toluafix_pushusertype_ref(lua_State* L, void* ptr, const char* type);
+TOLUA_API void toluafix_pushusertype_no_ref(lua_State* L, void* ptr, const char* type);
 
 #endif // __TOLUA_FIX_H_
